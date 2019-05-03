@@ -1,4 +1,9 @@
 #!/bin/bash
+#
+# Para executar!!!
+# chmod +x repositorios-centos-7.bash
+# ./repositorios-centos-7.bash
+
 
 echo "INSTALANDO - yum-plugin-priorities"
 
