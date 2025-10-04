@@ -35,7 +35,18 @@ shell-bash-scripts/
 │   ├── pos-instalacao-ubuntu.sh    # Pós-instalação Ubuntu 24.04.3 LTS
 │   ├── pos-instalacao-fedora-42.sh # Pós-instalação Fedora 42
 │   ├── lamp-centos7.sh             # Stack LAMP para CentOS 7
-│   └── repositorios-centos7.sh     # Configuração de repositórios CentOS 7
+│   ├── lamp-fedora42.sh            # Stack LAMP para Fedora 42
+│   └── #### lamp-fedora42.sh
+**Para:** Fedora 42+
+**Funcionalidades:**
+- ✅ Stack LAMP completa automatizada
+- ✅ Apache HTTP Server + PHP 8+ + MariaDB
+- ✅ phpMyAdmin pré-configurado
+- ✅ Configurações de segurança
+- ✅ Firewall e SELinux configurados
+- ✅ Página de teste e validação
+
+#### repositorios-centos7.sh     # Configuração de repositórios CentOS 7
 │
 └── 📊 AUTOMAÇÃO EMPRESARIAL
     └── TRABALHO-AUTOMACAO-V1.0SBE/
@@ -68,6 +79,9 @@ chmod +x *.sh
 
 # Executar um script (exemplo)
 ./backup-diretorio.sh
+
+# Stack LAMP para Fedora 42
+sudo ./lamp-fedora42.sh
 ```
 
 ## 📖 Guia de Scripts
@@ -214,7 +228,15 @@ sudo dnf install zenity  # Fedora
 - ✅ phpMyAdmin configurado
 - ✅ Configurações de segurança
 
-#### repositorios-centos7.sh
+#### lamp-fedora42.sh
+**Para:** Fedora 42+
+**Funcionalidades:**
+- ✅ Stack LAMP completa automatizada
+- ✅ Apache HTTP Server + PHP 8+ + MariaDB
+- ✅ phpMyAdmin pré-configurado
+- ✅ Configurações de segurança
+- ✅ Firewall e SELinux configurados
+- ✅ Página de teste e validação
 **Para:** CentOS 7/RHEL 7
 **Funcionalidades:**
 - ✅ EPEL, REMI, RPM Fusion
@@ -343,7 +365,7 @@ Este projeto está licenciado sob a Licença MIT - veja o arquivo [LICENSE](LICE
 Este README foi atualizado em **$(date '+%d/%m/%Y')**
 
 ### 📈 Estatísticas
-- **20+ scripts** únicos
+- **25+ scripts** únicos
 - **15+ funcionalidades** diferentes
 - **3 distribuições** suportadas
 - **2000+ linhas** de código
