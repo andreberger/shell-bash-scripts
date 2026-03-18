@@ -1,4 +1,4 @@
-#!/bin/bash
+ #!/bin/bash
 
 # Script de Pós-Instalação Ubuntu 24.04 LTS
 # Autor: Sistema de Automação
