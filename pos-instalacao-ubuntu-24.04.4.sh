@@ -13,9 +13,13 @@
 
 # Configurações do script
 set -e  # Sair se qualquer comando falhar
+set -o pipefail  # Detectar erros em pipes
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly LOG_FILE="/tmp/pos-instalacao-ubuntu-$(date '+%Y%m%d_%H%M%S').log"
 readonly TEMP_DIR="/tmp/ubuntu-setup-$$"
+
+# Modo debug (descomente para ativar)
+# set -x
 
 # Cores para output
 readonly RED='\033[0;31m'
@@ -228,12 +232,32 @@ enable_one_click_install() {
     
     print_message "$BLUE" "⚙️  Configurando suporte a apt: URLs..."
     
-    # Instalar gnome-software-plugin-snap para melhor integração
-    apt install -y gnome-software-plugin-snap >> "$LOG_FILE" 2>&1
-    apt install -y sessioninstaller >> "$LOG_FILE" 2>&1
+    # Instalar apturl (necessário para apt: URLs)
+    if apt install -y apturl >> "$LOG_FILE" 2>&1; then
+        print_message "$GREEN" "✅ apturl instalado"
+    else
+        print_message "$YELLOW" "⚠️  apturl não disponível, pulando..."
+    fi
     
-    # Configurar handlers de protocolo
-    cat > /usr/share/applications/apturl.desktop << 'EOF'
+    # Instalar gnome-software-plugin-snap (pode não existir em todas as versões)
+    if apt-cache show gnome-software-plugin-snap &> /dev/null; then
+        apt install -y gnome-software-plugin-snap >> "$LOG_FILE" 2>&1 || true
+        print_message "$GREEN" "✅ Plugin Snap instalado"
+    else
+        print_message "$YELLOW" "⚠️  Plugin Snap não disponível nesta versão"
+    fi
+    
+    # Instalar sessioninstaller (pode não existir no Ubuntu 24.04)
+    if apt-cache show sessioninstaller &> /dev/null; then
+        apt install -y sessioninstaller >> "$LOG_FILE" 2>&1 || true
+        print_message "$GREEN" "✅ sessioninstaller instalado"
+    else
+        print_message "$YELLOW" "⚠️  sessioninstaller não disponível nesta versão"
+    fi
+    
+    # Configurar handler de protocolo apt: se apturl estiver instalado
+    if command -v apturl &> /dev/null; then
+        cat > /usr/share/applications/apturl.desktop << 'EOF'
 [Desktop Entry]
 Name=APT URL Handler
 Comment=Install packages from web browsers
@@ -242,10 +266,11 @@ Type=Application
 NoDisplay=true
 MimeType=x-scheme-handler/apt;
 EOF
+        update-desktop-database >> "$LOG_FILE" 2>&1 || true
+        print_message "$GREEN" "✅ Handler apt: configurado"
+    fi
     
-    update-desktop-database >> "$LOG_FILE" 2>&1
-    
-    print_message "$GREEN" "✅ Instalação com 1 click habilitada!"
+    print_message "$GREEN" "✅ Instalação com 1 click configurada!"
 }
 
 #=============================================================================
@@ -257,9 +282,16 @@ install_gnome_software() {
     
     print_message "$BLUE" "📱 Instalando GNOME Software (Loja de Aplicativos)..."
     
-    apt install -y gnome-software >> "$LOG_FILE" 2>&1
-    apt install -y gnome-software-plugin-flatpak >> "$LOG_FILE" 2>&1
-    apt install -y gnome-software-plugin-snap >> "$LOG_FILE" 2>&1
+    apt install -y gnome-software >> "$LOG_FILE" 2>&1 || true
+    
+    # Plugins podem não estar disponíveis em todas as versões
+    if apt-cache show gnome-software-plugin-flatpak &> /dev/null; then
+        apt install -y gnome-software-plugin-flatpak >> "$LOG_FILE" 2>&1 || true
+    fi
+    
+    if apt-cache show gnome-software-plugin-snap &> /dev/null; then
+        apt install -y gnome-software-plugin-snap >> "$LOG_FILE" 2>&1 || true
+    fi
     
     print_message "$GREEN" "✅ GNOME Software instalado com sucesso!"
     print_message "$CYAN" "💡 Acesse pelo menu de aplicativos: 'Software' ou 'Loja'"
@@ -274,10 +306,17 @@ install_gnome_tweaks() {
     
     print_message "$BLUE" "🔧 Instalando GNOME Tweaks e extensões..."
     
-    apt install -y gnome-tweaks >> "$LOG_FILE" 2>&1
-    apt install -y gnome-shell-extensions >> "$LOG_FILE" 2>&1
-    apt install -y gnome-shell-extension-manager >> "$LOG_FILE" 2>&1
-    apt install -y chrome-gnome-shell >> "$LOG_FILE" 2>&1
+    apt install -y gnome-tweaks >> "$LOG_FILE" 2>&1 || true
+    apt install -y gnome-shell-extensions >> "$LOG_FILE" 2>&1 || true
+    
+    # Extension manager pode ter nome diferente em versões diferentes
+    if apt-cache show gnome-shell-extension-manager &> /dev/null; then
+        apt install -y gnome-shell-extension-manager >> "$LOG_FILE" 2>&1 || true
+    elif apt-cache show gnome-extensions-app &> /dev/null; then
+        apt install -y gnome-extensions-app >> "$LOG_FILE" 2>&1 || true
+    fi
+    
+    apt install -y chrome-gnome-shell >> "$LOG_FILE" 2>&1 || true
     
     print_message "$GREEN" "✅ GNOME Tweaks instalado!"
     print_message "$CYAN" "💡 Acesse pelo menu: 'Ajustes' ou 'Tweaks'"
@@ -459,10 +498,12 @@ install_stacer() {
     print_message "$BLUE" "🔧 Instalando Stacer..."
     
     cd "$TEMP_DIR"
-    wget -q https://github.com/oguzhaninan/Stacer/releases/download/v1.1.0/stacer_1.1.0_amd64.deb -O stacer.deb >> "$LOG_FILE" 2>&1
-    apt install -y ./stacer.deb >> "$LOG_FILE" 2>&1
-    
-    print_message "$GREEN" "✅ Stacer instalado!"
+    if wget -q --timeout=30 https://github.com/oguzhaninan/Stacer/releases/download/v1.1.0/stacer_1.1.0_amd64.deb -O stacer.deb >> "$LOG_FILE" 2>&1; then
+        apt install -y ./stacer.deb >> "$LOG_FILE" 2>&1 || print_message "$YELLOW" "⚠️  Erro ao instalar Stacer"
+        print_message "$GREEN" "✅ Stacer instalado!"
+    else
+        print_message "$YELLOW" "⚠️  Não foi possível baixar Stacer, pulando..."
+    fi
 }
 
 install_teamviewer() {
@@ -646,12 +687,28 @@ main() {
 
 error_handler() {
     local line_number=$1
-    print_message "$RED" "❌ Erro na linha $line_number"
-    print_message "$YELLOW" "⚠️  Verifique o log para mais detalhes: $LOG_FILE"
+    local last_command=$2
+    local exit_code=$3
+    
+    print_message "$RED" "❌ Erro crítico detectado!"
+    print_message "$RED" "   Linha: $line_number"
+    print_message "$RED" "   Código de saída: $exit_code"
+    print_message "$YELLOW" ""
+    print_message "$YELLOW" "📋 DIAGNÓSTICO:"
+    print_message "$YELLOW" "   • Verifique o log detalhado: $LOG_FILE"
+    print_message "$YELLOW" "   • Execute: tail -n 50 $LOG_FILE"
+    print_message "$YELLOW" ""
+    print_message "$CYAN" "💡 SOLUÇÃO:"
+    print_message "$CYAN" "   1. Verifique sua conexão com a internet"
+    print_message "$CYAN" "   2. Execute: sudo apt update"
+    print_message "$CYAN" "   3. Execute o script novamente"
+    print_message "$CYAN" "   4. Se o problema persistir, execute com debug:"
+    print_message "$CYAN" "      Edite o script e descomente a linha: set -x"
+    
     exit 1
 }
 
-trap 'error_handler $LINENO' ERR
+trap 'error_handler $LINENO "$BASH_COMMAND" $?' ERR
 
 #=============================================================================
 # EXECUÇÃO
