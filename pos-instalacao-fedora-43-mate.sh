@@ -1,13 +1,13 @@
 #!/bin/bash
 
 # ============================================================================
-# Script de Pós-Instalação - Fedora 43
+# Script de Pós-Instalação - Fedora 43 MATE Edition
 # ============================================================================
 # Autor: André Kroetz Berger
 # E-mail: andre@andre.poa.br
 # Site: andre.poa.br
-# Data: 18/03/2026
-# Descrição: Script completo de pós-instalação para Fedora 43
+# Data: 11/04/2026
+# Descrição: Script de pós-instalação para Fedora 43 MATE (já instalado)
 # ============================================================================
 
 # Cores para output
@@ -15,6 +15,7 @@ RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
+CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 # Função para exibir mensagens
@@ -44,6 +45,39 @@ if [ "$EUID" -ne 0 ]; then
     exit 1
 fi
 
+# Verificar se MATE está instalado
+check_mate() {
+    if ! command -v mate-session &> /dev/null; then
+        print_warning "MATE Desktop não detectado!"
+        print_warning "Este script é otimizado para Fedora 43 MATE Edition"
+        print_message "Deseja continuar mesmo assim? (s/n)"
+        read -r resposta
+        if [ "$resposta" != "s" ] && [ "$resposta" != "S" ]; then
+            print_message "Instalação cancelada."
+            exit 0
+        fi
+    else
+        print_message "✓ MATE Desktop detectado - Procedendo com instalação..."
+    fi
+}
+
+# Exibir banner
+clear
+echo -e "${CYAN}"
+cat << "EOF"
+╔═══════════════════════════════════════════════════════════════════════════╗
+║                                                                           ║
+║           📦 FEDORA 43 MATE EDITION - PÓS-INSTALAÇÃO                     ║
+║                                                                           ║
+║                    Script Otimizado para MATE Desktop                    ║
+║                                                                           ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+EOF
+echo -e "${NC}"
+echo ""
+
+check_mate
+
 # ============================================================================
 # 1. ATUALIZAÇÃO DO SISTEMA
 # ============================================================================
@@ -71,19 +105,23 @@ localectl set-keymap br-abnt2
 localectl set-x11-keymap br abnt2
 
 # ============================================================================
-# 3. INSTALAR MATE DESKTOP COM COMPIZ
+# 3. COMPIZ - EFEITOS 3D (OPCIONAL)
 # ============================================================================
 
-print_section "3. INSTALANDO MATE DESKTOP E COMPIZ"
+print_section "3. COMPIZ - GERENCIADOR DE JANELAS 3D (OPCIONAL)"
 
-print_message "Instalando MATE Desktop Environment..."
-dnf groupinstall -y "MATE Desktop"
-dnf install -y @mate-desktop
+print_message "Deseja instalar Compiz para efeitos 3D? (s/n)"
+read -r install_compiz
 
-print_message "Instalando Compiz e plugins..."
-dnf install -y compiz compiz-plugins-extra compiz-plugins-main
-dnf install -y compizconfig-python emerald emerald-themes
-dnf install -y fusion-icon
+if [ "$install_compiz" = "s" ] || [ "$install_compiz" = "S" ]; then
+    print_message "Instalando Compiz e plugins..."
+    dnf install -y compiz compiz-plugins-extra compiz-plugins-main
+    dnf install -y compizconfig-python emerald emerald-themes
+    dnf install -y fusion-icon
+    print_message "✓ Compiz instalado! Execute 'compiz --replace' para ativar"
+else
+    print_message "Pulando instalação do Compiz..."
+fi
 
 # ============================================================================
 # 4. ADICIONAR REPOSITÓRIOS RPM FUSION E FLATHUB
@@ -201,7 +239,7 @@ EOF
 dnf install -y anydesk
 
 print_message "Instalando Dropbox..."
-dnf install -y nautilus-dropbox
+dnf install -y caja-dropbox
 
 print_message "Instalando VirtualBox..."
 dnf install -y VirtualBox kernel-devel kernel-headers dkms
@@ -234,6 +272,14 @@ flatpak install -y flathub com.oguzhaninan.Stacer
 
 print_message "Instalando suporte para impressoras HP..."
 dnf install -y hplip hplip-gui
+
+print_message "Instalando MATE Tweak (Personalizador MATE)..."
+dnf install -y mate-tweak
+
+print_message "Instalando temas e ícones adicionais para MATE..."
+dnf install -y mate-themes
+dnf install -y papirus-icon-theme
+dnf install -y arc-theme
 
 # ============================================================================
 # 10. AMBIENTE DE DESENVOLVIMENTO
@@ -407,16 +453,26 @@ chown -R $SUDO_USER:$SUDO_USER /home/$SUDO_USER/Documentos
 print_section "INSTALAÇÃO CONCLUÍDA!"
 
 echo ""
-print_message "Script de pós-instalação do Fedora 43 concluído com sucesso!"
+echo -e "${CYAN}╔═══════════════════════════════════════════════════════════════════════════╗${NC}"
+echo -e "${CYAN}║                 ✓ FEDORA 43 MATE EDITION CONFIGURADO!                    ║${NC}"
+echo -e "${CYAN}╚═══════════════════════════════════════════════════════════════════════════╝${NC}"
+echo ""
+print_message "Script de pós-instalação concluído com sucesso!"
 print_message ""
-print_message "Algumas observações importantes:"
-print_message "  - Para configurar o MySQL/MariaDB, execute: sudo mysql_secure_installation"
-print_message "  - O phpMyAdmin está disponível em: http://localhost/phpmyadmin"
-print_message "  - Para iniciar o Compiz, use: compiz --replace"
-print_message "  - GitHub Desktop: Acesse via menu de aplicativos ou 'github-desktop'"
-print_message "  - Stacer: Ferramenta de otimização e monitoramento do sistema"
+print_message "📋 OBSERVAÇÕES IMPORTANTES:"
+print_message "  • MySQL/MariaDB: Execute 'sudo mysql_secure_installation' para configurar"
+print_message "  • phpMyAdmin disponível em: http://localhost/phpmyadmin"
+print_message "  • Compiz: Execute 'compiz --replace' para ativar efeitos 3D"
+print_message "  • GitHub Desktop: Acesse via menu ou comando 'github-desktop'"
+print_message "  • Stacer: Ferramenta de otimização do sistema"
+print_message "  • MATE Tweak: Personalize seu desktop MATE"
 print_message ""
-print_warning "RECOMENDADO: Reinicie o sistema para aplicar todas as mudanças."
+print_message "🎨 PERSONALIZAÇÃO MATE:"
+print_message "  • Use 'mate-tweak' para personalizar painéis e aparência"
+print_message "  • Temas Arc e Papirus Icons instalados"
+print_message "  • Configure em: Sistema → Preferências → Aparência"
+print_message ""
+print_warning "⚠️  RECOMENDADO: Reinicie o sistema para aplicar todas as mudanças."
 print_message ""
 read -p "Deseja reiniciar agora? (s/n): " resposta
 if [ "$resposta" = "s" ] || [ "$resposta" = "S" ]; then

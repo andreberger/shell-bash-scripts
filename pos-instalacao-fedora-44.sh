@@ -1,13 +1,13 @@
 #!/bin/bash
 
 # ============================================================================
-# Script de Pós-Instalação - Fedora 43
+# Script de Pós-Instalação - Fedora 44
 # ============================================================================
 # Autor: André Kroetz Berger
 # E-mail: andre@andre.poa.br
 # Site: andre.poa.br
-# Data: 18/03/2026
-# Descrição: Script completo de pós-instalação para Fedora 43
+# Data: 11/04/2026
+# Descrição: Script completo de pós-instalação para Fedora 44
 # ============================================================================
 
 # Cores para output
@@ -407,7 +407,7 @@ chown -R $SUDO_USER:$SUDO_USER /home/$SUDO_USER/Documentos
 print_section "INSTALAÇÃO CONCLUÍDA!"
 
 echo ""
-print_message "Script de pós-instalação do Fedora 43 concluído com sucesso!"
+print_message "Script de pós-instalação do Fedora 44 concluído com sucesso!"
 print_message ""
 print_message "Algumas observações importantes:"
 print_message "  - Para configurar o MySQL/MariaDB, execute: sudo mysql_secure_installation"
