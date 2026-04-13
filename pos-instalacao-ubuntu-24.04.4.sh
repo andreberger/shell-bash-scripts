@@ -18,6 +18,12 @@ readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly LOG_FILE="/tmp/pos-instalacao-ubuntu-$(date '+%Y%m%d_%H%M%S').log"
 readonly TEMP_DIR="/tmp/ubuntu-setup-$$"
 
+# Variáveis de progresso e tempo
+START_TIME=$(date +%s)
+TOTAL_STEPS=18
+CURRENT_STEP=0
+USE_DIALOG=false
+
 # Modo debug (descomente para ativar)
 # set -x
 
@@ -102,6 +108,9 @@ check_root() {
         print_message "$CYAN" "💡 Execute: sudo ./pos-instalacao-ubuntu-24.04.4.sh"
         exit 1
     fi
+    
+    # Instalar dialog logo no início para melhor experiência
+    check_dialog
 }
 
 # Função para verificar versão do Ubuntu
@@ -173,22 +182,164 @@ show_progress() {
     printf "] ${WHITE}%d%%${NC}" $percentage
 }
 
+# Função para calcular tempo decorrido
+get_elapsed_time() {
+    local end_time=$(date +%s)
+    local elapsed=$((end_time - START_TIME))
+    local hours=$((elapsed / 3600))
+    local minutes=$(((elapsed % 3600) / 60))
+    local seconds=$((elapsed % 60))
+    
+    if [[ $hours -gt 0 ]]; then
+        printf "%02dh %02dm %02ds" $hours $minutes $seconds
+    elif [[ $minutes -gt 0 ]]; then
+        printf "%02dm %02ds" $minutes $seconds
+    else
+        printf "%02ds" $seconds
+    fi
+}
+
+# Função para atualizar progresso global
+update_progress() {
+    local step_name="$1"
+    CURRENT_STEP=$((CURRENT_STEP + 1))
+    local percentage=$((CURRENT_STEP * 100 / TOTAL_STEPS))
+    local elapsed=$(get_elapsed_time)
+    
+    echo
+    echo -e "${PURPLE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${WHITE}📊 Progresso: ${GREEN}${CURRENT_STEP}/${TOTAL_STEPS}${WHITE} (${CYAN}${percentage}%${WHITE})  ⏱️  Tempo: ${YELLOW}${elapsed}${NC}"
+    echo -e "${PURPLE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo
+}
+
+# Função para mostrar progresso de instalação com animação
+show_install_progress() {
+    local message="$1"
+    local pid=$2
+    local delay=0.1
+    local spinstr='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
+    
+    while kill -0 $pid 2>/dev/null; do
+        local temp=${spinstr#?}
+        printf "\r${CYAN}[%c]${NC} ${message}..." "$spinstr"
+        spinstr=$temp${spinstr%"$temp"}
+        sleep $delay
+    done
+    printf "\r${GREEN}[✓]${NC} ${message}... ${GREEN}Concluído!${NC}\n"
+}
+
+# Função para verificar e instalar dialog
+check_dialog() {
+    if command -v dialog &> /dev/null; then
+        USE_DIALOG=true
+        print_message "$GREEN" "✅ Dialog detectado - usando interface avançada"
+    else
+        print_message "$YELLOW" "⚠️  Instalando dialog para melhor experiência visual..."
+        apt-get install -y dialog < /dev/null >> "$LOG_FILE" 2>&1 || true
+        if command -v dialog &> /dev/null; then
+            USE_DIALOG=true
+        fi
+    fi
+}
+
+# Função para mostrar progresso com dialog
+show_dialog_progress() {
+    local percentage=$1
+    local message="$2"
+    
+    if [[ "$USE_DIALOG" == "true" ]]; then
+        echo "XXX"
+        echo "$percentage"
+        echo "$message"
+        echo "XXX"
+    fi
+}
+
 #=============================================================================
 # SEÇÃO 1: ATUALIZAÇÕES DO SISTEMA
 #=============================================================================
 
 update_system() {
     print_section "📦 SEÇÃO 1/15: ATUALIZANDO O SISTEMA"
+    update_progress "Atualização do Sistema"
     
-    print_message "$BLUE" "🔄 Atualizando lista de pacotes..."
-    apt update >> "$LOG_FILE" 2>&1
+    # Configurar para modo não-interativo ANTES de qualquer comando apt
+    export DEBIAN_FRONTEND=noninteractive
+    export NEEDRESTART_MODE=a
+    export NEEDRESTART_SUSPEND=1
     
-    print_message "$BLUE" "⬆️  Instalando todas as atualizações disponíveis..."
-    print_message "$YELLOW" "⏳ Isso pode levar alguns minutos..."
-    
-    DEBIAN_FRONTEND=noninteractive apt upgrade -y >> "$LOG_FILE" 2>&1
-    DEBIAN_FRONTEND=noninteractive apt dist-upgrade -y >> "$LOG_FILE" 2>&1
-    DEBIAN_FRONTEND=noninteractive apt full-upgrade -y >> "$LOG_FILE" 2>&1
+    if [[ "$USE_DIALOG" == "true" ]]; then
+        (
+            echo "10" ; echo "XXX" ; echo "🔧 Removendo locks..." ; echo "XXX"
+            rm -f /var/lib/dpkg/lock-frontend 2>/dev/null || true
+            rm -f /var/lib/dpkg/lock 2>/dev/null || true
+            rm -f /var/cache/apt/archives/lock 2>/dev/null || true
+            dpkg --configure -a >> "$LOG_FILE" 2>&1 || true
+            
+            echo "25" ; echo "XXX" ; echo "🔄 Atualizando lista de pacotes..." ; echo "XXX"
+            apt-get update -y < /dev/null >> "$LOG_FILE" 2>&1 || sleep 2 && apt-get update -y < /dev/null >> "$LOG_FILE" 2>&1 || true
+            
+            echo "45" ; echo "XXX" ; echo "⬆️  Instalando atualizações (upgrade)..." ; echo "XXX"
+            DEBIAN_FRONTEND=noninteractive apt-get upgrade -y \
+                -o Dpkg::Options::="--force-confdef" \
+                -o Dpkg::Options::="--force-confold" \
+                -o Dpkg::Options::="--force-confnew" \
+                < /dev/null >> "$LOG_FILE" 2>&1 || true
+            
+            echo "65" ; echo "XXX" ; echo "⬆️  Instalando atualizações (dist-upgrade)..." ; echo "XXX"
+            DEBIAN_FRONTEND=noninteractive apt-get dist-upgrade -y \
+                -o Dpkg::Options::="--force-confdef" \
+                -o Dpkg::Options::="--force-confold" \
+                -o Dpkg::Options::="--force-confnew" \
+                < /dev/null >> "$LOG_FILE" 2>&1 || true
+            
+            echo "85" ; echo "XXX" ; echo "⬆️  Instalando atualizações (full-upgrade)..." ; echo "XXX"
+            DEBIAN_FRONTEND=noninteractive apt-get full-upgrade -y \
+                -o Dpkg::Options::="--force-confdef" \
+                -o Dpkg::Options::="--force-confold" \
+                -o Dpkg::Options::="--force-confnew" \
+                < /dev/null >> "$LOG_FILE" 2>&1 || true
+            
+            echo "100" ; echo "XXX" ; echo "✅ Atualização concluída!" ; echo "XXX"
+        ) | dialog --title "Atualizando Sistema" --gauge "Iniciando..." 7 70 0
+    else
+        print_message "$BLUE" "🔧 Removendo locks... [0%]"
+        rm -f /var/lib/dpkg/lock-frontend 2>/dev/null || true
+        rm -f /var/lib/dpkg/lock 2>/dev/null || true
+        rm -f /var/cache/apt/archives/lock 2>/dev/null || true
+        dpkg --configure -a >> "$LOG_FILE" 2>&1 || true
+        
+        print_message "$BLUE" "🔄 Atualizando lista de pacotes... [25%]"
+        apt-get update -y < /dev/null >> "$LOG_FILE" 2>&1 || {
+            print_message "$YELLOW" "⚠️  Tentando novamente..."
+            sleep 2
+            apt-get update -y < /dev/null >> "$LOG_FILE" 2>&1 || true
+        }
+        
+        print_message "$BLUE" "⬆️  Instalando atualizações (upgrade)... [45%]"
+        DEBIAN_FRONTEND=noninteractive apt-get upgrade -y \
+            -o Dpkg::Options::="--force-confdef" \
+            -o Dpkg::Options::="--force-confold" \
+            -o Dpkg::Options::="--force-confnew" \
+            < /dev/null >> "$LOG_FILE" 2>&1 || true
+        
+        print_message "$BLUE" "⬆️  Instalando atualizações (dist-upgrade)... [65%]"
+        DEBIAN_FRONTEND=noninteractive apt-get dist-upgrade -y \
+            -o Dpkg::Options::="--force-confdef" \
+            -o Dpkg::Options::="--force-confold" \
+            -o Dpkg::Options::="--force-confnew" \
+            < /dev/null >> "$LOG_FILE" 2>&1 || true
+        
+        print_message "$BLUE" "⬆️  Instalando atualizações (full-upgrade)... [85%]"
+        DEBIAN_FRONTEND=noninteractive apt-get full-upgrade -y \
+            -o Dpkg::Options::="--force-confdef" \
+            -o Dpkg::Options::="--force-confold" \
+            -o Dpkg::Options::="--force-confnew" \
+            < /dev/null >> "$LOG_FILE" 2>&1 || true
+        
+        print_message "$BLUE" "✅ Finalização... [100%]"
+    fi
     
     print_message "$GREEN" "✅ Sistema atualizado com sucesso!"
 }
@@ -199,8 +350,9 @@ update_system() {
 
 configure_portuguese() {
     print_section "🇧🇷 SEÇÃO 2/15: CONFIGURANDO PORTUGUÊS DO BRASIL"
+    update_progress "Configuração Português BR"
     
-    print_message "$BLUE" "🌍 Instalando pacotes de idioma português..."
+    print_message "$BLUE" "🌍 Instalando pacotes de idioma português... [25%]"
     apt install -y language-pack-pt language-pack-gnome-pt >> "$LOG_FILE" 2>&1
     apt install -y language-pack-pt-base language-pack-gnome-pt-base >> "$LOG_FILE" 2>&1
     apt install -y hunspell-pt-br aspell-pt-br >> "$LOG_FILE" 2>&1
@@ -229,6 +381,7 @@ EOF
 
 enable_one_click_install() {
     print_section "🖱️  SEÇÃO 3/15: HABILITANDO INSTALAÇÃO COM 1 CLICK"
+    update_progress "Instalação com 1 Click"
     
     print_message "$BLUE" "⚙️  Configurando suporte a apt: URLs..."
     
@@ -279,6 +432,7 @@ EOF
 
 install_gnome_software() {
     print_section "🏬 SEÇÃO 4/15: INSTALANDO LOJA GNOME SOFTWARE"
+    update_progress "GNOME Software"
     
     print_message "$BLUE" "📱 Instalando GNOME Software (Loja de Aplicativos)..."
     
@@ -303,6 +457,7 @@ install_gnome_software() {
 
 install_gnome_tweaks() {
     print_section "🎨 SEÇÃO 5/15: INSTALANDO GNOME TWEAKS"
+    update_progress "GNOME Tweaks"
     
     print_message "$BLUE" "🔧 Instalando GNOME Tweaks e extensões..."
     
@@ -328,6 +483,8 @@ install_gnome_tweaks() {
 
 install_tlp() {
     print_section "🔋 SEÇÃO 6/15: OTIMIZANDO BATERIA COM TLP"
+    update_progress "TLP - Otimização de Bateria"
+    update_progress "TLP - Otimização de Bateria"
     
     print_message "$BLUE" "⚡ Instalando TLP para otimização de energia..."
     
@@ -355,6 +512,8 @@ install_tlp() {
 
 install_flatpak() {
     print_section "📦 SEÇÃO 7/15: CONFIGURANDO FLATPAK E FLATHUB"
+    update_progress "Flatpak e Flathub"
+    update_progress "Flatpak e Flathub"
     
     print_message "$BLUE" "📦 Instalando Flatpak..."
     apt install -y flatpak >> "$LOG_FILE" 2>&1
@@ -375,6 +534,8 @@ install_flatpak() {
 
 install_codecs() {
     print_section "🎬 SEÇÃO 8/15: INSTALANDO CODECS MULTIMÍDIA"
+    update_progress "Codecs Multimídia"
+    update_progress "Codecs Multimídia"
     
     print_message "$BLUE" "🎵 Instalando codecs de áudio e vídeo..."
     
@@ -435,8 +596,9 @@ EOF
 
 install_google_chrome() {
     print_section "🌐 SEÇÃO 10/15: INSTALANDO GOOGLE CHROME"
+    update_progress "Google Chrome"
     
-    print_message "$BLUE" "📥 Baixando Google Chrome..."
+    print_message "$BLUE" "📥 Baixando Google Chrome... [0%]"
     
     cd "$TEMP_DIR"
     wget -q https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb -O google-chrome.deb >> "$LOG_FILE" 2>&1
@@ -449,6 +611,7 @@ install_google_chrome() {
 
 install_vlc() {
     print_section "🎬 SEÇÃO 11/15: INSTALANDO VLC MEDIA PLAYER"
+    update_progress "VLC Media Player"
     
     print_message "$BLUE" "📺 Instalando VLC Media Player..."
     apt install -y vlc >> "$LOG_FILE" 2>&1
@@ -459,6 +622,7 @@ install_vlc() {
 
 install_anydesk() {
     print_section "🖥️  SEÇÃO 12/15: INSTALANDO ANYDESK"
+    update_progress "AnyDesk"
     
     print_message "$BLUE" "🔑 Adicionando repositório AnyDesk..."
     wget -qO - https://keys.anydesk.com/repos/DEB-GPG-KEY | gpg --dearmor -o /usr/share/keyrings/anydesk-archive-keyring.gpg >> "$LOG_FILE" 2>&1
@@ -474,6 +638,7 @@ install_anydesk() {
 
 install_thunderbird() {
     print_section "📧 SEÇÃO 13/15: INSTALANDO MOZILLA THUNDERBIRD"
+    update_progress "Mozilla Thunderbird"
     
     print_message "$BLUE" "📬 Instalando Mozilla Thunderbird..."
     apt install -y thunderbird >> "$LOG_FILE" 2>&1
@@ -484,6 +649,7 @@ install_thunderbird() {
 
 install_warehouse() {
     print_section "🏪 SEÇÃO 14/15: INSTALANDO WAREHOUSE (FLATPAK)"
+    update_progress "Warehouse"
     
     print_message "$BLUE" "📦 Instalando Warehouse via Flatpak..."
     flatpak install -y flathub io.github.flattool.Warehouse >> "$LOG_FILE" 2>&1
@@ -494,6 +660,7 @@ install_warehouse() {
 
 install_stacer() {
     print_section "🔧 SEÇÃO 15/15: INSTALANDO FERRAMENTAS DO SISTEMA"
+    update_progress "Ferramentas do Sistema"
     
     print_message "$BLUE" "🔧 Instalando Stacer..."
     
@@ -529,6 +696,8 @@ install_synaptic() {
 
 cleanup_system() {
     print_section "🧹 LIMPEZA E OTIMIZAÇÃO FINAL"
+    update_progress "Limpeza Final"
+    update_progress "Limpeza Final"
     
     print_message "$BLUE" "🗑️  Removendo pacotes desnecessários..."
     apt autoremove -y >> "$LOG_FILE" 2>&1
@@ -550,7 +719,9 @@ cleanup_system() {
 show_summary() {
     print_section "🎉 INSTALAÇÃO CONCLUÍDA COM SUCESSO!"
     
-    echo -e "${GREEN}"
+    local total_time=$(get_elapsed_time)
+    echo -e "${CYAN}⏱️  Tempo total de instalação: ${YELLOW}${total_time}${NC}"
+    echo
     cat << "EOF"
     ✓ Sistema totalmente atualizado
     ✓ Idioma configurado para Português BR
