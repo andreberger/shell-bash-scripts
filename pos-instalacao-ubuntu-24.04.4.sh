@@ -690,6 +690,13 @@ install_synaptic() {
     print_message "$GREEN" "✅ Synaptic instalado!"
 }
 
+install_github_desktop() {
+    print_message "$BLUE" "🐙 Instalando GitHub Desktop via Flatpak..."
+    flatpak install -y flathub io.github.shiftey.Desktop >> "$LOG_FILE" 2>&1 || true
+    
+    print_message "$GREEN" "✅ GitHub Desktop instalado!"
+}
+
 #=============================================================================
 # SEÇÃO FINAL: LIMPEZA E OTIMIZAÇÃO
 #=============================================================================
@@ -846,6 +853,7 @@ main() {
     install_stacer
     install_teamviewer
     install_synaptic
+    install_github_desktop
     cleanup_system
     
     # Exibir resumo final

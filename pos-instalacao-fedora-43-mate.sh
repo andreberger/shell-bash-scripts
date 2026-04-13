@@ -15,8 +15,15 @@ RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
+PURPLE='\033[0;35m'
 CYAN='\033[0;36m'
+WHITE='\033[1;37m'
 NC='\033[0m' # No Color
+
+# Variáveis de progresso e tempo
+START_TIME=$(date +%s)
+TOTAL_STEPS=13
+CURRENT_STEP=0
 
 # Função para exibir mensagens
 print_message() {
@@ -37,6 +44,37 @@ print_section() {
     echo -e "${BLUE} $1${NC}"
     echo -e "${BLUE}============================================================================${NC}"
     echo ""
+}
+
+# Função para calcular tempo decorrido
+get_elapsed_time() {
+    local end_time=$(date +%s)
+    local elapsed=$((end_time - START_TIME))
+    local hours=$((elapsed / 3600))
+    local minutes=$(((elapsed % 3600) / 60))
+    local seconds=$((elapsed % 60))
+    
+    if [[ $hours -gt 0 ]]; then
+        printf "%02dh %02dm %02ds" $hours $minutes $seconds
+    elif [[ $minutes -gt 0 ]]; then
+        printf "%02dm %02ds" $minutes $seconds
+    else
+        printf "%02ds" $seconds
+    fi
+}
+
+# Função para atualizar progresso global
+update_progress() {
+    local step_name="$1"
+    CURRENT_STEP=$((CURRENT_STEP + 1))
+    local percentage=$((CURRENT_STEP * 100 / TOTAL_STEPS))
+    local elapsed=$(get_elapsed_time)
+    
+    echo
+    echo -e "${PURPLE}═══════════════════════════════════════════════════════════════════════════════${NC}"
+    echo -e "${WHITE}📊 Progresso: ${GREEN}${CURRENT_STEP}/${TOTAL_STEPS}${WHITE} (${CYAN}${percentage}%${WHITE})  ⏱️  Tempo: ${YELLOW}${elapsed}${NC}"
+    echo -e "${PURPLE}═══════════════════════════════════════════════════════════════════════════════${NC}"
+    echo
 }
 
 # Verificar se está rodando como root
@@ -83,6 +121,7 @@ check_mate
 # ============================================================================
 
 print_section "1. ATUALIZANDO O SISTEMA"
+update_progress "Atualização do Sistema"
 
 print_message "Atualizando todos os pacotes do sistema..."
 dnf update -y
@@ -93,6 +132,7 @@ dnf upgrade -y
 # ============================================================================
 
 print_section "2. CONFIGURANDO IDIOMA PARA PORTUGUÊS-BR"
+update_progress "Configuração Português BR"
 
 print_message "Instalando pacotes de idioma português..."
 dnf install -y langpacks-pt_BR
@@ -109,6 +149,7 @@ localectl set-x11-keymap br abnt2
 # ============================================================================
 
 print_section "3. COMPIZ - GERENCIADOR DE JANELAS 3D (OPCIONAL)"
+update_progress "Compiz (Opcional)"
 
 print_message "Deseja instalar Compiz para efeitos 3D? (s/n)"
 read -r install_compiz
@@ -128,6 +169,7 @@ fi
 # ============================================================================
 
 print_section "4. CONFIGURANDO REPOSITÓRIOS"
+update_progress "Repositórios RPM Fusion"
 
 print_message "Adicionando RPM Fusion Free..."
 dnf install -y https://download1.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm
@@ -150,6 +192,7 @@ flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.f
 # ============================================================================
 
 print_section "5. INSTALANDO CODECS MULTIMÍDIA"
+update_progress "Codecs Multimídia"
 
 print_message "Instalando codecs de áudio e vídeo..."
 dnf install -y gstreamer1-plugins-{bad-\*,good-\*,base} gstreamer1-plugin-openh264 gstreamer1-libav --exclude=gstreamer1-plugins-bad-free-devel
@@ -168,6 +211,7 @@ dnf install -y x264 x265
 # ============================================================================
 
 print_section "6. INSTALANDO SUPORTE A DVDS CRIPTOGRAFADOS"
+update_progress "Suporte a DVDs"
 
 print_message "Instalando libdvdcss..."
 dnf install -y libdvdcss
@@ -177,6 +221,7 @@ dnf install -y libdvdcss
 # ============================================================================
 
 print_section "7. INSTALANDO FERRAMENTAS DE COMPRESSÃO"
+update_progress "Ferramentas de Compressão"
 
 print_message "Instalando 7zip e suporte a ZIP..."
 dnf install -y p7zip p7zip-plugins unzip zip unrar
@@ -186,6 +231,7 @@ dnf install -y p7zip p7zip-plugins unzip zip unrar
 # ============================================================================
 
 print_section "8. INSTALANDO JAVA"
+update_progress "Java (OpenJDK)"
 
 print_message "Instalando OpenJDK (Java Development Kit)..."
 dnf install -y java-latest-openjdk java-latest-openjdk-devel
@@ -197,6 +243,7 @@ dnf install -y java-21-openjdk java-21-openjdk-devel
 # ============================================================================
 
 print_section "9. INSTALANDO SOFTWARES GERAIS"
+update_progress "Softwares Gerais"
 
 print_message "Instalando PuTTY..."
 dnf install -y putty
@@ -286,6 +333,7 @@ dnf install -y arc-theme
 # ============================================================================
 
 print_section "10. INSTALANDO AMBIENTE DE DESENVOLVIMENTO"
+update_progress "Ambiente de Desenvolvimento"
 
 print_message "Instalando Code::Blocks com GCC..."
 dnf groupinstall -y "C Development Tools and Libraries"
@@ -364,6 +412,7 @@ dnf install -y vim-X11
 # ============================================================================
 
 print_section "11. INSTALANDO GAMES"
+update_progress "Games e Emuladores"
 
 print_message "Instalando Flycast (Emulador de SEGA Dreamcast)..."
 flatpak install -y flathub org.flycast.Flycast
@@ -382,6 +431,7 @@ dnf install -y supertuxkart
 # ============================================================================
 
 print_section "12. INSTALANDO SERVIDOR LAMP + MONGODB"
+update_progress "Servidor LAMP + MongoDB"
 
 print_message "Instalando Apache..."
 dnf install -y httpd
@@ -428,6 +478,7 @@ systemctl start mongod
 # ============================================================================
 
 print_section "13. CONFIGURAÇÕES FINAIS"
+update_progress "Configurações Finais"
 
 print_message "Configurando firewall para serviços web..."
 firewall-cmd --permanent --add-service=http
@@ -451,7 +502,9 @@ chown -R $SUDO_USER:$SUDO_USER /home/$SUDO_USER/Documentos
 # ============================================================================
 
 print_section "INSTALAÇÃO CONCLUÍDA!"
-
+local total_time=$(get_elapsed_time)
+echo -e "${CYAN}⏱️ Tempo total de instalação: ${YELLOW}${total_time}${NC}"
+echo
 echo ""
 echo -e "${CYAN}╔═══════════════════════════════════════════════════════════════════════════╗${NC}"
 echo -e "${CYAN}║                 ✓ FEDORA 43 MATE EDITION CONFIGURADO!                    ║${NC}"
